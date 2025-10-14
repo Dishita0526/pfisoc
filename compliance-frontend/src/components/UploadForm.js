@@ -1,26 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 
-function UploadForm({ onUpload }) {
+function UploadForm() {
   const [file, setFile] = useState(null);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+  };
+
+  const handleUpload = async (e) => {
     e.preventDefault();
-    if (file) {
-      onUpload(file);
-    } else {
-      alert("Please select a file first!");
+    if (!file) {
+      alert("Please select a PDF file first!");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setLoading(true);
+    try {
+      const response = await fetch("http://127.0.0.1:5000/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+      setResult(data);
+    } catch (error) {
+      console.error("Error uploading file:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <input 
-        type="file" 
-        accept=".png,.jpg,.jpeg,.pdf" 
-        onChange={(e) => setFile(e.target.files[0])} 
-      />
-      <button type="submit">Upload</button>
-    </form>
+    <div className="upload-form">
+      <h2>Upload PDF</h2>
+      <form onSubmit={handleUpload}>
+        <input type="file" accept="application/pdf" onChange={handleFileChange} />
+        <button type="submit">Upload</button>
+      </form>
+
+      {loading && <p>Extracting text...</p>}
+
+      {result && (
+        <div className="result">
+          <h3>Extracted Text from {result.filename}</h3>
+          <pre>{result.text}</pre>
+        </div>
+      )}
+    </div>
   );
 }
 
