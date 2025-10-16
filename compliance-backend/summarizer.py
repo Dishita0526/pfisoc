@@ -2,37 +2,32 @@
 from transformers import pipeline
 import torch
 import textwrap
+import threading
 
-# Use a small summarization model for speed
 MODEL_NAME = "facebook/bart-large-cnn"
 
-# Load pipeline (CPU mode by default)
-device = 0 if torch.cuda.is_available() else -1
-print(f"Device set to use {'GPU' if device == 0 else 'CPU'}")
+_model_lock = threading.Lock()
+_summarizer_pipeline = None
 
-summarizer_pipeline = pipeline(
-    "summarization",
-    model=MODEL_NAME,
-    device=device
-)
+def _load_pipeline():
+    global _summarizer_pipeline
+    with _model_lock:
+        if _summarizer_pipeline is None:
+            device = 0 if torch.cuda.is_available() else -1
+            print(f"[summarizer] Loading model {MODEL_NAME} on {'GPU' if device==0 else 'CPU'} ...")
+            _summarizer_pipeline = pipeline("summarization", model=MODEL_NAME, device=device)
+            print("[summarizer] Model loaded.")
+    return _summarizer_pipeline
 
 def chunk_text(text, max_chunk_length=1000):
-    """
-    Split long text into smaller chunks for summarization.
-    """
     paragraphs = textwrap.wrap(text, width=max_chunk_length)
     return paragraphs
 
 def summarize_text(text):
-    """
-    Summarizes long text by splitting it into chunks.
-    Returns a list of summarized clauses.
-    """
+    pipeline_inst = _load_pipeline()
     chunks = chunk_text(text)
     summaries = []
-
     for chunk in chunks:
-        summary = summarizer_pipeline(chunk, max_length=150, min_length=30, do_sample=False)
+        summary = pipeline_inst(chunk, max_length=150, min_length=30, do_sample=False)
         summaries.append(summary[0]["summary_text"])
-
     return summaries
