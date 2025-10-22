@@ -5,15 +5,13 @@ import requests
 import uuid
 from typing import List, Dict, Any
 
-# --- GLOBAL CONFIGURATION ---
-
-# API Configuration (NOTE: API_KEY is now passed as an argument to the function)
+# API configuration 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key="
 
-# System Instruction: Defines the AI's role and tone
+# System instruction
 SYSTEM_PROMPT = """You are a highly specialized and meticulous Regulatory Compliance Analyst. Your task is to analyze a given section of a legal document, identify all explicit and implicit compliance obligations, and translate them into structured, actionable tasks. You must strictly adhere to the provided JSON schema for output. If no clear obligation is found in the text, you must return an empty list: []."""
 
-# JSON Schema: Enforces the structure of the AI output
+# JSON schema
 OBLIGATION_SCHEMA = {
     "type": "ARRAY",
     "items": {
