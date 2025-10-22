@@ -2,8 +2,6 @@ import fitz # PyMuPDF
 import json
 import uuid
 
-# --- GLOBAL CONFIGURATION (These are placeholder values for chunking) ---
-# Aim for ~2000 tokens per chunk for optimal Gemini processing
 MAX_CHARS_PER_CHUNK = 7000 
 OVERLAP_CHARS = 1000 # To maintain context between chunks
 
@@ -86,10 +84,5 @@ def extract_and_chunk_pdf(pdf_path: str) -> list[dict]:
     print(f"Document processed into {len(chunks)} chunks for AI analysis.")
     return chunks
 
-# Example of how this module would be used:
 if __name__ == '__main__':
-    # NOTE: In the Flask app, this would receive the path to the uploaded temp file.
-    # For testing, replace 'path/to/your/document.pdf' with a real file path.
-    # chunks_for_ai = extract_and_chunk_pdf("path/to/your/document.pdf")
-    # print(json.dumps(chunks_for_ai[0], indent=2))
     pass

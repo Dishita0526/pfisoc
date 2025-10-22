@@ -1,7 +1,5 @@
 import React, { useState } from "react";
 
-// NOTE: This file assumes Tailwind CSS is available for styling (not included in this snippet)
-
 function UploadForm() {
   const [file, setFile] = useState(null);
   const [result, setResult] = useState(null);
@@ -9,7 +7,14 @@ function UploadForm() {
   const [error, setError] = useState(null);
 
   const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
+    // Basic file validation for PDF
+    if (e.target.files.length > 0 && e.target.files[0].type === 'application/pdf') {
+        setFile(e.target.files[0]);
+        setError(null);
+    } else {
+        setFile(null);
+        setError("Please select a valid PDF file.");
+    }
   };
 
   const handleUpload = async (e) => {
@@ -18,51 +23,74 @@ function UploadForm() {
     setResult(null);
 
     if (!file) {
-      alert("Please select a PDF file first!");
+      setError("Please select a file to upload.");
       return;
     }
+
+    setLoading(true);
 
     const formData = new FormData();
     formData.append("file", file);
 
-    setLoading(true);
-
-    // --- Timeout Logic Added ---
+    // aborting the fetch request if a timeout occurs
     const controller = new AbortController();
+    const signal = controller.signal;
+
+    // Timeout mechanism
     const timeoutId = setTimeout(() => {
-      controller.abort();
-    }, 900000); // 5 minutes (in milliseconds)
+        controller.abort();
+        setError("Request timed out. The AI analysis took too long to respond.");
+        setLoading(false);
+    }, 900000); 
 
     try {
+      // 1. POST request to /upload_regulation
       const response = await fetch("http://127.0.0.1:5000/upload_regulation", {
         method: "POST",
         body: formData,
-        signal: controller.signal, // Attach abort signal
+        signal: signal, // Pass the signal to the fetch request
       });
 
-      clearTimeout(timeoutId); // Stop timeout if success
+      clearTimeout(timeoutId); // Clear the timeout if the first request returns
 
       if (!response.ok) {
+        // Attempt to parse JSON error message from backend
         const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        throw new Error(errorData.error || `Upload failed with status ${response.status}`);
       }
 
-      const data = await response.json();
-      setResult(data);
-    } catch (err) {
-      if (err.name === "AbortError") {
-        setError("⏰ The server took too long to respond. Please try again or use a smaller PDF.");
-      } else {
-        setError(`Analysis Failed: ${err.message}`);
+      const uploadData = await response.json(); // Data from the first POST
+ 
+      if (!uploadData.upload_id) {
+          throw new Error("Analysis started successfully, but no unique ID was returned to fetch results.");
       }
-      console.error("Error during analysis pipeline:", err);
+
+      // 2. GET request to fetch results using the returned upload_id
+      const uploadId = uploadData.upload_id;
+      
+      const fetchResponse = await fetch(`http://127.0.0.1:5000/get_latest_tasks/${uploadId}`);
+      
+      if (!fetchResponse.ok) {
+          const errorData = await fetchResponse.json();
+          throw new Error(errorData.message || `Failed to fetch tasks: HTTP status ${fetchResponse.status}`);
+      }
+
+      const taskData = await fetchResponse.json();
+      setResult(taskData);
+
+    } catch (err) {
+      if (err.name === 'AbortError') {
+          // Error already set by timeout
+      } else {
+          setError(err.message);
+      }
     } finally {
       clearTimeout(timeoutId);
       setLoading(false);
     }
   };
 
-  // --- Helper function to format JSON output ---
+  // helper function to format JSON output
   const formatJson = (data) => {
     try {
       return JSON.stringify(data, null, 2);
@@ -74,7 +102,6 @@ function UploadForm() {
   return (
     <div className="upload-form p-6 max-w-4xl mx-auto">
       <h2 className="text-2xl font-bold mb-4">Upload Regulatory Document</h2>
-
       <form onSubmit={handleUpload} className="flex space-x-4 mb-8">
         <input
           type="file"
@@ -84,21 +111,19 @@ function UploadForm() {
         />
         <button
           type="submit"
-          disabled={loading || !file}
+          disabled={loading || !file || error} 
           className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 disabled:opacity-50"
         >
           {loading ? "Analyzing..." : "Upload & Analyze"}
         </button>
       </form>
-
-      {/* --- Status Display --- */}
       {loading && (
         <p className="text-xl text-indigo-600 font-medium">
-          Extracting text and preparing for AI analysis... (This may take several minutes for long documents)
+          Extracting text and preparing for AI analysis... (This may take
+          several minutes for long documents)
         </p>
       )}
-
-      {error && (
+      {error && ( 
         <div
           className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mt-4"
           role="alert"
@@ -108,27 +133,68 @@ function UploadForm() {
         </div>
       )}
 
-      {/* --- Result Display (for Phase 2 debugging) --- */}
       {result && result.analyzed_tasks && (
         <div className="result mt-6">
-          <p className="text-lg font-semibold mb-2 text-green-700">
-            <span className="font-extrabold text-2xl mr-2">✅</span> Analysis Pipeline Initiated!
-          </p>
-          <p className="mb-4">
-            AI analysis complete. **{result.analyzed_tasks.length}** compliance tasks identified.
+          <p className="text-lg font-semibold mb-4 text-green-700">
+            <span className="font-extrabold text-2xl mr-2">✅</span> Analysis
+            Complete! **{result.analyzed_tasks.length}** Actionable Tasks
+            Identified.
           </p>
 
-          <h3 className="text-xl font-bold mt-6 mb-3">Structured Tasks (JSON Output)</h3>
-          <div className="bg-gray-800 p-4 rounded-lg shadow-xl overflow-x-auto">
-            <pre className="text-green-400 text-xs whitespace-pre-wrap font-mono">
-              {formatJson(result.analyzed_tasks)}
-            </pre>
+          <h3 className="text-xl font-bold mt-6 mb-3">Compliance Task List</h3>
+
+          <div className="mb-4">
+            <label className="mr-2 font-semibold">Filter by Department:</label>
+            {/* Implement a filter state here */}
           </div>
 
-          <p className="mt-8 italic text-sm text-gray-500">
-            *This raw output is only for development. In the final version (Phase 3), the results (Tasks, Gaps, Audit
-            Trail) will appear here shortly (via Firestore).
-          </p>
+          <div className="overflow-x-auto">
+            <table className="table-auto w-full border-collapse border border-gray-300">
+              <thead>
+                <tr className="bg-gray-200">
+                  <th className="border p-2 text-left">Task Summary</th>
+                  <th className="border p-2 text-left">Department</th>
+                  <th className="border p-2 text-center">Risk</th>
+                  <th className="border p-2 text-left">Remediation Steps</th>
+                  <th className="border p-2 text-left">
+                    XAI Rationale (Source)
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.analyzed_tasks.map((task, index) => (
+                  <tr
+                    key={task.obligation_id || index}
+                    className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                  >
+                    <td className="border p-2 font-medium">{task.summary}</td>
+                    <td className="border p-2 text-sm">{task.department}</td>
+                    <td
+                      className={`border p-2 text-center font-bold 
+                                ${
+                                  task.risk_score === "High"
+                                    ? "text-red-600"
+                                    : task.risk_score === "Medium"
+                                    ? "text-yellow-600"
+                                    : "text-green-600"
+                                }`}
+                    >
+                      {task.risk_score}
+                    </td>
+                    <td className="border p-2 text-sm">
+                      {task.remediation_steps}
+                    </td>
+                    <td className="border p-2 text-xs italic text-gray-600">
+                      {task.xai_rationale}{" "}
+                      <span className="font-bold ml-1 text-indigo-500">
+                        (P.{task.source_page})
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
