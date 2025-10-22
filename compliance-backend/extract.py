@@ -4,7 +4,7 @@ import uuid
 
 # --- GLOBAL CONFIGURATION (These are placeholder values for chunking) ---
 # Aim for ~2000 tokens per chunk for optimal Gemini processing
-MAX_CHARS_PER_CHUNK = 8000 
+MAX_CHARS_PER_CHUNK = 7000 
 OVERLAP_CHARS = 1000 # To maintain context between chunks
 
 def extract_and_chunk_pdf(pdf_path: str) -> list[dict]:
@@ -13,7 +13,7 @@ def extract_and_chunk_pdf(pdf_path: str) -> list[dict]:
     and chunks the text into manageable sizes for the AI.
     
     Args:
-        pdf_path: The local file path to the uploaded PDF.
+        pdfs_path: The local file path to the uploaded PDF.
 
     Returns:
         A list of dictionaries, where each dictionary is a text chunk 
