@@ -14,6 +14,7 @@
   },
   "scripts": {
   "start": "react-scripts start",
+  "build": "react-scripts build",
   "backend": "cd ../compliance-backend && source venv/bin/activate && python app.py",
   "dev": "npx concurrently \"npm start\" \"npm run backend\""
 }
