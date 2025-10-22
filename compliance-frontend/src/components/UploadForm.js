@@ -18,8 +18,7 @@ function UploadForm() {
     setResult(null);
 
     if (!file) {
-      // NOTE: Using a simple JS alert() here, in a production app, use a custom modal.
-      alert("Please select a PDF file first!"); 
+      alert("Please select a PDF file first!");
       return;
     }
 
@@ -27,13 +26,21 @@ function UploadForm() {
     formData.append("file", file);
 
     setLoading(true);
-    
+
+    // --- Timeout Logic Added ---
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 900000); // 5 minutes (in milliseconds)
+
     try {
-      // **FIXED ENDPOINT**: Use the correct Flask route
       const response = await fetch("http://127.0.0.1:5000/upload_regulation", {
         method: "POST",
         body: formData,
+        signal: controller.signal, // Attach abort signal
       });
+
+      clearTimeout(timeoutId); // Stop timeout if success
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -43,35 +50,40 @@ function UploadForm() {
       const data = await response.json();
       setResult(data);
     } catch (err) {
+      if (err.name === "AbortError") {
+        setError("⏰ The server took too long to respond. Please try again or use a smaller PDF.");
+      } else {
+        setError(`Analysis Failed: ${err.message}`);
+      }
       console.error("Error during analysis pipeline:", err);
-      setError(`Analysis Failed: ${err.message}`);
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   };
 
-  // Helper function to format the JSON output nicely
+  // --- Helper function to format JSON output ---
   const formatJson = (data) => {
     try {
-        return JSON.stringify(data, null, 2);
+      return JSON.stringify(data, null, 2);
     } catch (e) {
-        return "Error displaying results.";
+      return "Error displaying results.";
     }
-  }
+  };
 
   return (
     <div className="upload-form p-6 max-w-4xl mx-auto">
       <h2 className="text-2xl font-bold mb-4">Upload Regulatory Document</h2>
-      
+
       <form onSubmit={handleUpload} className="flex space-x-4 mb-8">
-        <input 
-          type="file" 
-          accept="application/pdf" 
-          onChange={handleFileChange} 
+        <input
+          type="file"
+          accept="application/pdf"
+          onChange={handleFileChange}
           className="file-input file-input-bordered w-full max-w-xs"
         />
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           disabled={loading || !file}
           className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 disabled:opacity-50"
         >
@@ -87,7 +99,10 @@ function UploadForm() {
       )}
 
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mt-4" role="alert">
+        <div
+          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mt-4"
+          role="alert"
+        >
           <strong className="font-bold">Error:</strong>
           <span className="block sm:inline"> {error}</span>
         </div>
@@ -109,11 +124,11 @@ function UploadForm() {
               {formatJson(result.analyzed_tasks)}
             </pre>
           </div>
-          
-          <p className="mt-8 italic text-sm text-gray-500">
-            *This raw output is only for development. In the final version (Phase 3), the results (Tasks, Gaps, Audit Trail) will appear here shortly (via Firestore).
-          </p>
 
+          <p className="mt-8 italic text-sm text-gray-500">
+            *This raw output is only for development. In the final version (Phase 3), the results (Tasks, Gaps, Audit
+            Trail) will appear here shortly (via Firestore).
+          </p>
         </div>
       )}
     </div>
